@@ -2498,6 +2498,38 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
       return replaceInstUsesWith(
           CI,
           Builder.CreateIntrinsic(II->getType(), Intrinsic::scmp, {LHS, RHS}));
+
+    // scmp(sext(X), Y) -> scmp(X, Y) if Y can use type of X.
+    auto representableWithType = [](Value *V, Type *T) -> Value* {
+      Value *X;
+      if (match(V, m_SExt(m_Value(X))) && X->getType() == T)
+        return X;
+
+      unsigned Bits = T->getScalarSizeInBits();
+      const APInt *C;
+      if (match(V, m_APInt(C)) && C->isSignedIntN(Bits)) {
+        if (auto *VecTy = dyn_cast<VectorType>(T))
+          return ConstantVector::getSplat(
+              VecTy->getElementCount(),
+              ConstantInt::get(VecTy->getElementType(), C->trunc(Bits)));
+
+        return ConstantInt::get(T, C->trunc(Bits));
+      }
+
+      return nullptr;
+    };
+
+    if (match(I0, m_SExt(m_Value(LHS))))
+      if (Value *V = representableWithType(I1, LHS->getType()))
+        return replaceInstUsesWith(
+            CI,
+            Builder.CreateIntrinsic(II->getType(), Intrinsic::scmp, {LHS, V}));
+    if (match(I1, m_SExt(m_Value(RHS))))
+      if (Value *V = representableWithType(I0, RHS->getType()))
+        return replaceInstUsesWith(
+            CI,
+            Builder.CreateIntrinsic(II->getType(), Intrinsic::scmp, {V, RHS}));
+
     break;
   }
   case Intrinsic::bitreverse: {

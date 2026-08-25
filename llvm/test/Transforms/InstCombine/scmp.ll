@@ -1019,3 +1019,44 @@ define i8 @scmp_zero_of_ucmp(i32 %x, i32 %y) {
   %r = call i8 @llvm.scmp.i8.i64(i64 %cmp, i64 0)
   ret i8 %r
 }
+
+
+; Fold scmp(sext(X), C) into scmp(X, C)
+
+; CHECK-LABEL: @scmp_sext_const(
+; CHECK-NEXT: [[R:%.*]] = call i8 @llvm.scmp.i8.i8(i8 %x, i8 5)
+; CHECK-NEXT: ret i8 [[R]]
+define i8 @scmp_sext_const(i8 %x) {
+  %sx = sext i8 %x to i32
+  %r = call i8 @llvm.scmp(i32 %sx, i32 5)
+  ret i8 %r
+}
+
+; CHECK-LABEL: @scmp_sext_sext(
+; CHECK-NEXT: [[R:%.*]] = call i8 @llvm.scmp.i8.i8(i8 %x, i8 %y)
+; CHECK-NEXT: ret i8 [[R]]
+define i8 @scmp_sext_sext(i8 %x, i8 %y) {
+  %sx = sext i8 %x to i64
+  %sy = sext i8 %y to i64
+  %r = call i8 @llvm.scmp(i64 %sx, i64 %sy)
+  ret i8 %r
+}
+
+; CHECK-LABEL: @scmp_sext_const_vec(
+; CHECK-NEXT: [[R:%.*]] = call <4 x i8> @llvm.scmp.v4i8.v4i8(<4 x i8> %x, <4 x i8> splat (i8 5))
+; CHECK-NEXT: ret <4 x i8> [[R]]
+define <4 x i8> @scmp_sext_const_vec(<4 x i8> %x) {
+  %sx = sext <4 x i8> %x to <4 x i32>
+  %r = call <4 x i8> @llvm.scmp.v4i32(<4 x i32> %sx, <4 x i32> <i32 5, i32 5, i32 5, i32 5>)
+  ret <4 x i8> %r
+}
+
+; CHECK-LABEL: @scmp_sext_sext_vec(
+; CHECK-NEXT: [[R:%.*]] = call <4 x i8> @llvm.scmp.v4i8.v4i8(<4 x i8> %x, <4 x i8> %y)
+; CHECK-NEXT: ret <4 x i8> [[R]]
+define <4 x i8> @scmp_sext_sext_vec(<4 x i8> %x, <4 x i8> %y) {
+  %sx = sext <4 x i8> %x to <4 x i64>
+  %sy = sext <4 x i8> %y to <4 x i64>
+  %r = call <4 x i8> @llvm.scmp.v4i64(<4 x i64> %sx, <4 x i64> %sy)
+  ret <4 x i8> %r
+}
